@@ -1,7 +1,7 @@
 import os
 from math import ceil, floor
-import re
 
+import plotly
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 
 from openpyxl.styles import Font
-
 # from openpyxl import load_workbook
 # from openpyxl.styles.numbers import builtin_format_code
 
@@ -291,8 +290,9 @@ def Pathloss_Plot_figure(filename, Result_var):
         fig.update_layout(autosize=False, width=1600, height=900, template="plotly_white", margin=dict(l=30, r=40, t=50, b=20))
         fig.show()
 
-        f_name = f"{os.path.splitext(filename[0])[0]}.pdf"  # filename을 확장자를 지운 후 pdf 확장자로 지정
-        fig.write_image(f_name)
+        f_name = f"{os.path.splitext(filename[0])[0]}_loss.html"  # filename을 확장자를 지운 후 pdf 확장자로 지정
+        plotly.offline.plot(fig, filename=f_name, auto_open=False)
+        # fig.write_image(f_name)
         dir, file = os.path.split((f_name))
         Model = file.split("_")[0]
         timecheck = datetime.now().strftime("%Y-%m%d_%H%M")
