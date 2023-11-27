@@ -1,6 +1,7 @@
 import os
 from math import ceil, floor
 
+import plotly
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -42,10 +43,10 @@ def Daseul_plot_figure(filename):
             my_cols = [str(i) for i in range(12)]  # create some col names
             df_Data = pd.read_csv(file, sep="\t|,", names=my_cols, header=None, engine="python")
             # 캘 도중 에러 발생 시 첫 열에 Nan 데이터 저장되서 count 에러 발생함 -> Drop 처리
-            df_null = df_Data[df_Data["0"].isnull()].index
-            df_Data.drop(df_null, inplace=True)
+            df_Data.drop(df_Data[df_Data["0"].isnull()].index, inplace=True)
             df_Data = df_Data.reset_index(drop=True)
             count = df_Data[df_Data["0"].str.contains("// << Equipment Loss Table - B to B >>")].shape[0]
+            Re_count = df_Data[df_Data["0"].str.contains("// Re-Test")].shape[0]
             # Spec.은 for문에 넣어서 count 마다 업데이트 할 수 있지만, 최종값으로 덮어쓰기 되기 때문에 1번만 실행하는 것으로 수정함.
             Type_Read = df_Data[df_Data["0"].str.contains("RF Cable Type")].iloc[:, :2].reset_index(drop=True)
 
@@ -57,36 +58,49 @@ def Daseul_plot_figure(filename):
             Jig_list = df_Data[df_Data["0"].str.contains("JIG :")].iloc[:, :1]
             lineip_list = df_Data[df_Data["0"].str.contains("RDM_LOT :")].iloc[:, :1]
 
+            if (Type_BtoB == 18) or (Type_BtoB == 19):
+                BtoB_Size = 98
+            elif Type_BtoB == 62:
+                BtoB_Size = 129
+            else:
+                BtoB_Size = 58
+
+            if Type_Cable == 7:
+                RFSW_Size = 98
+            elif Type_Cable == 62:
+                RFSW_Size = 129
+            else:
+                RFSW_Size = 58
+
             if Type_Cable != "N/A":  # ? BtoB + RF Cable Case
                 Spec_BtoB_L, Spec_BtoB_H = Type_value("BtoB", Type_BtoB)
                 Spec_Cable_L, Spec_Cable_H = Type_value("RF_Cable", Type_Cable)
 
-                BtoB1 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B >>")]
-                BtoB2 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B 2 >>")]
-                RFSW = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table >>")]
+                BtoB1 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B >>")].to_list()
+                BtoB2 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B 2 >>")].to_list()
+                RFSW = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table >>")].to_list()
+                End_of_log = df_Data.index[(df_Data["0"].str.contains("//Total :"))].to_list()
 
-                for Number in range(count):
+                for Number in range(count - Re_count):
+                    if Number == count - 1:
+                        df_Check = df_Data.iloc[BtoB1[Number] + 3 :, :2]
+                    else:
+                        df_Check = df_Data.iloc[BtoB1[Number] + 3 : End_of_log[Number], :2]
+
+                    Re_test = any(df_Check["0"].str.contains("// Re-Test"))
+
+                    if Re_test:
+                        # ! Re-test 라면 BtoB1을 다음 인덱스 값으로 넘긴다.
+                        del BtoB1[Number]
+
                     Jig = Jig_list.iloc[Number].to_list()[0].strip()
                     lineip = lineip_list.iloc[Number].to_list()[0].split(":")[1]
                     lineip = lineip.split("_")[0].strip()
 
-                    if (Type_BtoB == 18) or (Type_BtoB == 19):
-                        BtoB_Size = 98
-                    elif Type_BtoB == 62:
-                        BtoB_Size = 129
-                    else:
-                        BtoB_Size = 58
-
-                    if Type_Cable == 7:
-                        RFSW_Size = 98
-                    elif Type_Cable == 62:
-                        RFSW_Size = 129
-                    else:
-                        RFSW_Size = 58
-
                     BtoB1_Start = BtoB1[Number] + 3
                     BtoB1_Stop = BtoB1_Start + BtoB_Size
                     df_BtoB1 = df_Data.iloc[BtoB1_Start:BtoB1_Stop, :2]
+
                     BtoB1_Value = df_BtoB1.iloc[:, 1:].reset_index(drop=True)
                     BtoB1_Value = BtoB1_Value.astype(float)
                     BtoB1_Value.columns = [f"{Model}_IP_{lineip}_{Jig}"]
@@ -95,7 +109,7 @@ def Daseul_plot_figure(filename):
                     BtoB1_Item.columns = ["Frequency"]
                     df_BtoB_1st = pd.concat([df_BtoB_1st, BtoB1_Value], axis=1)
 
-                    if BtoB2.size != 0:
+                    if BtoB2:
                         BtoB2_Start = BtoB2[Number] + 3
                         BtoB2_Stop = BtoB2_Start + BtoB_Size
                         df_BtoB2 = df_Data.iloc[BtoB2_Start:BtoB2_Stop, :2]
@@ -126,24 +140,30 @@ def Daseul_plot_figure(filename):
             else:  # ? BtoB + BtoB Case
                 Spec_BtoB_L, Spec_BtoB_H = Type_value("BtoB", Type_BtoB)
 
-                BtoB1 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B >>")]
-                BtoB2 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B 2 >>")]
+                BtoB1 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B >>")].to_list()
+                BtoB2 = df_Data.index[(df_Data["0"] == "// << Equipment Loss Table - B to B 2 >>")].to_list()
+                End_of_log = df_Data.index[(df_Data["0"].str.contains("//Total :"))].to_list()
 
-                for Number in range(count):
+                for Number in range(count - Re_count):
+                    if Number == count - 1:
+                        df_Check = df_Data.iloc[BtoB1[Number] + 3 :, :2]
+                    else:
+                        df_Check = df_Data.iloc[BtoB1[Number] + 3 : End_of_log[Number], :2]
+
+                    Re_test = any(df_Check["0"].str.contains("// Re-Test"))
+
+                    if Re_test:
+                        # ! Re-test 라면 BtoB1을 다음 인덱스 값으로 넘긴다.
+                        del BtoB1[Number]
+
                     Jig = Jig_list.iloc[Number].to_list()[0].strip()
                     lineip = lineip_list.iloc[Number].to_list()[0].split(":")[1]
                     lineip = lineip.split("_")[0].strip()
 
-                    if (Type_BtoB == 18) or (Type_BtoB == 19):
-                        BtoB_Size = 98
-                    elif Type_BtoB == 62:
-                        BtoB_Size = 129
-                    else:
-                        BtoB_Size = 58
-
                     BtoB1_Start = BtoB1[Number] + 3
                     BtoB1_Stop = BtoB1_Start + BtoB_Size
                     df_BtoB1 = df_Data.iloc[BtoB1_Start:BtoB1_Stop, :2]
+
                     BtoB1_Value = df_BtoB1.iloc[:, 1:].reset_index(drop=True)
                     BtoB1_Value = BtoB1_Value.astype(float)
                     BtoB1_Value.columns = [f"{Model}_IP_{lineip}_{Jig}"]
@@ -152,7 +172,7 @@ def Daseul_plot_figure(filename):
                     BtoB1_Item.columns = ["Frequency"]
                     df_BtoB_1st = pd.concat([df_BtoB_1st, BtoB1_Value], axis=1)
 
-                    if BtoB2.size != 0:
+                    if BtoB2:  # ! 리스트 BtoB2가 비어있지 않으면
                         BtoB2_Start = BtoB2[Number] + 3
                         BtoB2_Stop = BtoB2_Start + BtoB_Size
                         df_BtoB2 = df_Data.iloc[BtoB2_Start:BtoB2_Stop, :2]
@@ -581,15 +601,16 @@ def Daseul_plot_figure(filename):
         # fig.update_traces(hoverinfo = 'name+y')
         fig.show()
 
-        f_name = f"{os.path.splitext(filename[0])[0]}.pdf"  # filename을 확장자를 지운 후 pdf 확장자로 지정
-        fig.write_image(f_name)
+        f_name = f"{os.path.splitext(filename[0])[0]}_loss.html"  # filename을 확장자를 지운 후 pdf 확장자로 지정
+        plotly.offline.plot(fig, filename=f_name, auto_open=False)
+        # fig.write_image(f_name)
         dir, file = os.path.split((f_name))
         Model = file.split("_")[0]
         timecheck = datetime.now().strftime("%Y-%m%d_%H%M")
 
         # Save Data to Excel
         Excel_file = f"Export_{Model}_Daseul_{timecheck}.xlsx"
-        with pd.ExcelWriter(Excel_file) as writer:
+        with pd.ExcelWriter(Excel_file, engine="openpyxl") as writer:
             df_BtoB_1st.to_excel(writer, sheet_name="BtoB1")
             if Check_BtoB2:
                 df_BtoB_2nd.to_excel(writer, sheet_name="BtoB2")
