@@ -1,3 +1,9 @@
+# %% [markdown]
+# ># Pathloss Cal PGM Plotly
+# 
+# - V1.1
+#   - Daseul RF Cal log 에 Re - Test 포함되있을 경우 Error 수정
+
 # %%
 import glob
 
@@ -16,11 +22,11 @@ def condition(value, filename):
             daseul.Daseul_plot_figure(filename)
         elif value == 2:  # Pathloss
             path.Pathloss_Plot_figure(filename, Result_var)
-    except Exception as e:
+    except FileExistsError as e:
         msgbox.showwarning("Warning", e)
 
 
-Win_GUI = ttkbst.Window(title="Pathloss Cal PGM Plotly V1.0 20231102", themename="cosmo")
+Win_GUI = ttkbst.Window(title="Pathloss Cal PGM Plotly V1.1 20231115", themename="cosmo")
 Win_GUI.attributes("-topmost", True)
 Win_GUI.geometry("625x165")
 
@@ -45,7 +51,6 @@ for fname in glob.glob("C:\\DGS\\LOGS\\*.csv"):
     list_file.insert(tk.END, fname)
 
 scrollbar.config(command=list_file.yview)
-
 
 # %%
 # 경로 프레임
@@ -83,7 +88,6 @@ btn_transf = ttkbst.Button(
 )
 btn_transf.place(x=510, y=5, width=100, height=30)
 
-
 # %%
 # Cal log 파일 선택
 file_frame = ttkbst.Frame(Left_frame)
@@ -106,7 +110,6 @@ chkbox1 = ttkbst.Checkbutton(file_frame, text="Include Failed log", variable=Res
 # chkbox1.deselect()
 chkbox1.place(x=360, y=20)
 
-
 # %%
 Win_GUI.bind("<F1>", lambda event: [func.add_file("Daseul", list_file)])
 Win_GUI.bind("<F2>", lambda event: [func.add_file("Path", list_file)])
@@ -123,6 +126,5 @@ Win_GUI.bind(
 
 Win_GUI.resizable(False, False)
 Win_GUI.mainloop()
-
 
 
